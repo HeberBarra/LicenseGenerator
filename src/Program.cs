@@ -1,91 +1,116 @@
-﻿namespace LicenseGenerator;
+﻿using LicenseGenerator.config;
+using LicenseGenerator.data.repository;
+using LicenseGenerator.data.service;
+using LicenseGenerator.domain.model;
+using LicenseGenerator.utils;
+
+namespace LicenseGenerator;
+
+internal enum MainMenuOptions
+{
+    AddTemplate,
+    ListTemplates,
+    SearchById,
+    UpdateTemplate,
+    DeleteTemplate,
+    CreateLicenseFile,
+    ShowConfig,
+    Exit
+}
+
+internal enum UpdateTemplateMenuOptions
+{
+    ChangeName,
+    ChangeBody,
+    SaveChanges,
+    DiscardChanges
+}
 
 public static class Program
 {
     public const string ProgramName = "LicenseGenerator";
-    private const int AddTemplateOption = 0;
-    private const int ListTemplatesOption = 1;
-    private const int SearchByIdOption = 2;
-    private const int UpdateTemplateOption = 3;
-    private const int DeleteTemplateOption = 4;
-    private const int CreateLicenseFileOption = 5;
-    private const int ShowConfigOption = 6;
-    private const int ExitOption = 7;
-    private static Configurator? Configurator { get; set; }
-    private static TemplateManager? TemplateManager { get; set; }
-    private static LicenseGenerator? LicenseGenerator { get; set; }
-    
+
+    private static Configurator Configurator { get; }
+
+    private static LicenseGenerator LicenseGenerator { get; }
+    private static TemplateService TemplateService { get; }
+    private static TemplateRepository TemplateRepository { get; }
+
+    static Program()
+    {
+        Configurator = new Configurator(ConfigurationDirectoryPicker.PickConfigurationDirectory());
+        Configurator.Configure();
+        LicenseGenerator = new LicenseGenerator(Configurator.LicenseFilename);
+        TemplateService = new TemplateService(Configurator.DatabaseFile);
+        TemplateService.InitService();
+        TemplateRepository = new TemplateRepository(TemplateService);
+    }
+
     public static int Main()
     {
-        Configurator = new Configurator();
-        Configurator.Configure();
-        if (Configurator.DatabaseFile != null) TemplateManager = new TemplateManager(Configurator.DatabaseFile);
-        if (Configurator.LicenseFilename != null) LicenseGenerator = new LicenseGenerator(Configurator.LicenseFilename);
+        ClearTerminalScreen.Clear();
 
-        if (TemplateManager == null || LicenseGenerator == null)
-            return 1;
-        
         start:
-        ShowMenu();
-        int option = GetChosenOption();
+        Console.WriteLine();
+        ShowMainMenu();
+        MainMenuOptions option = (MainMenuOptions)GetChosenOption();
+        ClearTerminalScreen.Clear();
 
         switch (option)
         {
-            
-            case AddTemplateOption:
+            case MainMenuOptions.AddTemplate:
                 AddTemplate();
                 goto start;
-            
-            case ListTemplatesOption:
+
+            case MainMenuOptions.ListTemplates:
                 ListTemplates();
                 goto start;
-            
-            case SearchByIdOption:
+
+            case MainMenuOptions.SearchById:
                 SearchById();
                 goto start;
-            
-            case UpdateTemplateOption:
+
+            case MainMenuOptions.UpdateTemplate:
                 UpdateTemplate();
                 goto start;
-            
-            case DeleteTemplateOption:
+
+            case MainMenuOptions.DeleteTemplate:
                 DeleteTemplate();
                 goto start;
-            
-            case CreateLicenseFileOption:
+
+            case MainMenuOptions.CreateLicenseFile:
                 CreateLicenseFile();
                 goto start;
-            
-            case ShowConfigOption:
+
+            case MainMenuOptions.ShowConfig:
                 Configurator.ShowConfiguration();
                 goto start;
-            
-            case ExitOption:
+
+            case MainMenuOptions.Exit:
                 Console.WriteLine("Exiting program...");
                 break;
-            
+
             default:
                 Console.WriteLine("Invalid Option. Try again...");
                 goto start;
-            
         }
-        
-        TemplateManager.CloseConnection();
-        
+
+        TemplateService.Dispose();
+
         return 0;
     }
-    
+
     private static void AddTemplate()
     {
         string? templateName = GetTemplateName();
-        if (templateName == null) 
+        if (templateName == null)
         {
             Console.WriteLine("Operation canceled. Returning to main menu...");
             return;
         }
 
-        string?  body = GetTemplateBody();
-        if (body == null) 
+        string? body = ReadTemplateBodyFile.Read();
+        if (body == null)
         {
             Console.WriteLine("Operation canceled. Returning to main menu...");
             return;
@@ -96,24 +121,21 @@ public static class Program
             Name = templateName,
             Body = body
         };
-        
-        TemplateManager!.AddTemplate(template);
+
+        TemplateRepository.Save(template);
         Console.WriteLine("Template saved with success.");
     }
 
-    private static long? GetTemplateId()
+    private static int? GetTemplateId()
     {
         while (true)
         {
             Console.Write("Template ID: \n> ");
             string? textId = Console.ReadLine();
 
-            if (string.IsNullOrWhiteSpace(textId))
-            {
-                return null;
-            }
+            if (string.IsNullOrWhiteSpace(textId)) return null;
 
-            long id;
+            int id;
             try
             {
                 id = int.Parse(textId);
@@ -134,139 +156,104 @@ public static class Program
         {
             Console.Write("Template name: \n> ");
             string? name = Console.ReadLine();
-            
+
             return name == string.Empty ? null : name;
         }
     }
-    
-    private static string? GetTemplateBody() 
-    {
-        while (true)
-        {
-            Console.Write("Template body filepath: \n> ");
-            string? file = Console.ReadLine();
 
-            if (string.IsNullOrWhiteSpace(file))
-            {
-                return null;
-            }
-            
-            if (!File.Exists(file)) 
-            {
-                Console.WriteLine($"Error! File {file} doesn't exists. Try again...");
-                continue;
-            }
-
-            if (File.ReadAllLines(file).Length != 0) return string.Join("\n", File.ReadAllLines(file));
-            
-            Console.WriteLine($"Error! File {file} is empty. Try again...");
-        }
-    }
-    
     private static void ListTemplates()
     {
-        List<Template> templates = TemplateManager!.GetEntries();
-        
-        if (templates.Count == 0) 
-        {
-            Console.WriteLine("There isn't any template registered");
-        }
-        
+        List<Template> templates = TemplateRepository.List();
+
+        if (templates.Count == 0) Console.WriteLine("There isn't any template registered");
+
         templates.ForEach(template => Console.WriteLine($"ID: {template.Id} - {template.Name}"));
     }
-    
+
     private static void SearchById()
     {
-        long? id = GetTemplateId();
-        
-        if (id == null)
-            return;
+        int? id = GetTemplateId();
 
-        Template? template = TemplateManager!.SearchById(id);
+        if (id == null) return;
 
-        if (template == null) 
+        Template? template = TemplateRepository.SearchById((int)id);
+
+        if (template == null)
         {
             Console.WriteLine("Template not found.");
             return;
         }
-        
+
         Console.WriteLine($"ID: {template.Id}");
         Console.WriteLine($"Name: {template.Name}");
         Console.WriteLine($"Body: \n{template.Body}");
     }
-    
+
     private static void UpdateTemplate()
     {
-        const int changeName = 0;
-        const int changeBody = 1;
-        const int saveChanges = 2;
-        const int discardChanges = 3;
-        long? id = GetTemplateId();
-        
-        if (id == null)
-            return;
+        int? id = GetTemplateId();
 
-        Template? template = TemplateManager!.SearchById(id);
-        
-        if (template == null) 
+        if (id == null) return;
+
+        Template? template = TemplateRepository.SearchById((int)id);
+
+        if (template == null)
         {
             Console.WriteLine("Template not found.");
             return;
         }
-        
+
         start:
-        Console.WriteLine($"[ {changeName} ] Change template name");
-        Console.WriteLine($"[ {changeBody} ] Change template body");
-        Console.WriteLine($"[ {saveChanges} ] Save changes");
-        Console.WriteLine($"[ {discardChanges} ] Discard changes");
-        int option = GetChosenOption();
-        
+        Console.WriteLine($"[ {(int)UpdateTemplateMenuOptions.ChangeName} ] Change template name");
+        Console.WriteLine($"[ {(int)UpdateTemplateMenuOptions.ChangeBody} ] Change template body");
+        Console.WriteLine($"[ {(int)UpdateTemplateMenuOptions.SaveChanges} ] Save changes");
+        Console.WriteLine($"[ {(int)UpdateTemplateMenuOptions.DiscardChanges} ] Discard changes");
+        UpdateTemplateMenuOptions option = (UpdateTemplateMenuOptions)GetChosenOption();
+
         switch (option)
         {
-            case changeName:
+            case UpdateTemplateMenuOptions.ChangeName:
                 string? name = GetTemplateName();
 
                 if (name != null)
                     template.Name = name;
-                
+
                 goto start;
-            
-            case changeBody:
-                string? body = GetTemplateBody();
+
+            case UpdateTemplateMenuOptions.ChangeBody:
+                string? body = ReadTemplateBodyFile.Read();
 
                 if (body != null)
                     template.Body = body;
 
                 goto start;
-            
-            case saveChanges:
-                TemplateManager.UpdateEntry(template);
+
+            case UpdateTemplateMenuOptions.SaveChanges:
+                TemplateRepository.Update(template);
                 return;
-            
-            case discardChanges:
+
+            case UpdateTemplateMenuOptions.DiscardChanges:
                 return;
-            
+
             default:
                 Console.WriteLine("Invalid option. Try again...");
                 goto start;
         }
-        
     }
-    
+
     private static void DeleteTemplate()
     {
         long? id = GetTemplateId();
-        
-        if (id == null)
-            return;
-        
-        TemplateManager!.DeleteEntry(id);
+
+        if (id == null) return;
+
+        TemplateRepository.Delete((int)id);
     }
-    
+
     private static List<string> GetAuthorsName()
     {
         List<string> authors = [];
-        
+
         Console.Write("Add author(s)? [y/N]\n> ");
         string? option = Console.ReadLine();
 
@@ -274,55 +261,58 @@ public static class Program
         {
             Console.Write("Author's name: \n> ");
             string? author = Console.ReadLine();
-            
+
             if (string.IsNullOrWhiteSpace(author))
                 return authors;
-            
+
             authors.Add(author);
             Console.Write("Add another author? [y/N]\n> ");
             option = Console.ReadLine();
         }
-        
+
         return authors;
     }
-    
+
     private static void CreateLicenseFile()
     {
         Console.Write("License file destination path: \n> ");
         string? destinationPath = Console.ReadLine();
-        
-        if (string.IsNullOrWhiteSpace(destinationPath)) 
+
+        if (string.IsNullOrWhiteSpace(destinationPath))
             return;
 
         long? id = GetTemplateId();
-        
-        if (id == null)
-            return;
 
-        Template? template = TemplateManager!.SearchById(id);
-        
-        if (template == null) 
+        if (id == null) return;
+
+        Template? template = TemplateRepository.SearchById((int)id);
+
+        if (template == null)
         {
             Console.WriteLine("Template not found.");
             return;
         }
 
         List<string> authors = GetAuthorsName();
-        if (template.Body != null) LicenseGenerator!.CreateLicenseFile(template.Body, destinationPath, authors);
+
+        if (template.Body == null) return;
+
+        License license = new(Configurator.LicenseFilename, destinationPath, template.Body, authors);
+        LicenseGenerator.CreateLicense(license);
     }
-    
-    private static void ShowMenu() 
+
+    private static void ShowMainMenu()
     {
-        Console.WriteLine($"[ {AddTemplateOption} ] Add Template");
-        Console.WriteLine($"[ {ListTemplatesOption} ] List Templates");
-        Console.WriteLine($"[ {SearchByIdOption} ] Search by ID");
-        Console.WriteLine($"[ {UpdateTemplateOption} ] Update Template");
-        Console.WriteLine($"[ {DeleteTemplateOption} ] Delete Template");
-        Console.WriteLine($"[ {CreateLicenseFileOption} ] Create license file");
-        Console.WriteLine($"[ {ShowConfigOption} ] Show config");
-        Console.WriteLine($"[ {ExitOption} ] Exit Program");
+        Console.WriteLine($"[ {(int)MainMenuOptions.AddTemplate} ] Add Template");
+        Console.WriteLine($"[ {(int)MainMenuOptions.ListTemplates} ] List Templates");
+        Console.WriteLine($"[ {(int)MainMenuOptions.SearchById} ] Search by ID");
+        Console.WriteLine($"[ {(int)MainMenuOptions.UpdateTemplate} ] Update Template");
+        Console.WriteLine($"[ {(int)MainMenuOptions.DeleteTemplate} ] Delete Template");
+        Console.WriteLine($"[ {(int)MainMenuOptions.CreateLicenseFile} ] Create license file");
+        Console.WriteLine($"[ {(int)MainMenuOptions.ShowConfig} ] Show config");
+        Console.WriteLine($"[ {(int)MainMenuOptions.Exit} ] Exit Program");
     }
-    
+
     private static int GetChosenOption()
     {
         while (true)
@@ -330,17 +320,19 @@ public static class Program
             Console.Write("Choose an option: \n> ");
             string? input = Console.ReadLine();
             int option;
-            
+
             if (input == null)
             {
                 Console.WriteLine("Input cannot be null. Try again...");
                 continue;
             }
-            
-            try 
+
+            try
             {
                 option = int.Parse(input);
-            } catch (FormatException) {
+            }
+            catch (FormatException)
+            {
                 Console.WriteLine("Please enter a valid number. Try again...");
                 continue;
             }
@@ -348,5 +340,5 @@ public static class Program
 
             return option;
         }
-    } 
+    }
 }
