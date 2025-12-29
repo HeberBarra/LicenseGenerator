@@ -40,7 +40,7 @@ public static class Program
     {
         Configurator = new Configurator(ConfigurationDirectoryPicker.PickConfigurationDirectory());
         Configurator.Configure();
-        LicenseGenerator = new LicenseGenerator(Configurator.LicenseFilename);
+        LicenseGenerator = new LicenseGenerator();
         TemplateService = new TemplateService(Configurator.DatabaseFile);
         TemplateService.InitService();
         TemplateRepository = new TemplateRepository(TemplateService);

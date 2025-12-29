@@ -3,9 +3,8 @@ using LicenseGenerator.utils;
 
 namespace LicenseGenerator;
 
-public class LicenseGenerator(string filename)
+public class LicenseGenerator
 {
-    private string Filename { get; set; } = filename;
 
     public void CreateLicense(License license)
     {
