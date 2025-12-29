@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.1
       - name: Create checksum file
-        runs: touch SHA256SUM
+        run: touch SHA256SUM
 
       - name: Download Linux x64 executable
         uses: actions/download-artifact@v7.0.0
