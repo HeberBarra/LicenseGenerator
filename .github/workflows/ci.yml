@@ -61,18 +61,24 @@ jobs:
         uses: actions/download-artifact@v7.0.0
         with:
           name: LicenseGenerator-Linux-x64
+      - name: Rename executable file
+        run: mv LicenseGenerator LicenseGenerator-Linux-x64
       - run: sha256sum LicenseGenerator-Linux-x64 >> SHA256SUM
 
       - name: Download OSX x64 executable
         uses: actions/download-artifact@v7.0.0
         with:
           name: LicenseGenerator-OSX-x64
+      - name: Rename executable file
+        run: mv LicenseGenerator LicenseGenerator-OSX-x64
       - run: sha256sum LicenseGenerator-OSX-x64 >> SHA256SUM
 
       - name: Download Linux x64 executable
         uses: actions/download-artifact@v7.0.0
         with:
           name: LicenseGenerator-Windows-x64.exe
+      - name: Rename executable file
+        run: mv LicenseGenerator.exe LicenseGenerator-Windows-x64.exe
       - run: sha256sum LicenseGenerator-Windows-x64.exe >> SHA256SUM
 
       - name: Release
