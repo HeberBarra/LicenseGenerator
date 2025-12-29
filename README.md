@@ -2,7 +2,7 @@
 
 A simple utility program to quickly create licenses files from a specified template(selected from a sqlite database).
 
-__SIDENOTE__: I created this project because I didn’t want to waste too much time creating license files manually(my friends might not agree on that one though, but ok) and also to get the basics of the .NET environment. Due to that, I don’t have many plans for this project. In its current stage it's almost perfect for me, the only thing missing for me is a pipeline building system using GitHub Actions.
+__SIDENOTE__: I created this project because I didn’t want to waste too much time creating license files manually(my friends might not agree on that one though, but ok) and also to get the basics of the .NET environment. Due to that, I don’t have many plans for this project. In its current stage it's almost perfect for me.
 
 ## Placeholders
 
